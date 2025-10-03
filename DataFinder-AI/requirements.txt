@@ -1,0 +1,20 @@
+# Core ML
+torch
+sentence-transformers
+
+# Web & scraping
+duckduckgo-search
+beautifulsoup4
+trafilatura
+requests
+
+# Connectors
+huggingface_hub
+kaggle
+
+# UI
+streamlit
+
+# LLM API (Groq/OpenAI)
+groq
+openai
