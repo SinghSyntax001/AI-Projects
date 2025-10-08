@@ -1,5 +1,3 @@
-
-
 import os
 import json
 from groq import Groq
@@ -9,6 +7,12 @@ class DatasetEvaluatorAgent:
         self.client = Groq(api_key=os.getenv("GROQ_API_KEY"))
 
     def evaluate(self, user_query: str, metadata: dict) -> dict:
+        if metadata.get("title") == "N/A" or metadata.get("description") == "N/A":
+            return {
+                "robustness_score": 0,
+                "reason": "Could not evaluate due to incomplete metadata from scraping failure."
+            }
+
         prompt = f"""
             You are an expert ML research assistant.  
             Your task is to evaluate if a dataset is suitable and robust for training a machine learning or deep learning model.  

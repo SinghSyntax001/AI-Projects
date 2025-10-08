@@ -1,6 +1,7 @@
 import requests
 import trafilatura
 from bs4 import BeautifulSoup
+from requests.exceptions import RequestException
 
 class ScrapeAgent:
     def scrape_metadata(self, url: str) -> dict:
@@ -9,17 +10,31 @@ class ScrapeAgent:
             response.raise_for_status()
             html_content = response.text
 
-            ext = trafilatura.extract(html_content)
+            # Try to extract with trafilatura first
+            extracted_text = trafilatura.extract(html_content)
+            
+            # Fallback to BeautifulSoup if trafilatura fails
+            if not extracted_text:
+                soup = BeautifulSoup(html_content, "html.parser")
+                extracted_text = " ".join(p.get_text() for p in soup.find_all('p'))
+
             soup = BeautifulSoup(html_content, "html.parser")
             title = soup.title.string.strip() if soup.title else url
 
             return {
                 "url": url,
                 "title": title,
-                "description": (ext[:500] if ext else "").strip(),
+                "description": (extracted_text[:500] if extracted_text else "").strip(),
                 "source": self._infer_source(url)
             }
 
+        except RequestException as e:
+            return {
+                "url": url,
+                "title": "N/A",
+                "description": f"Error during request: {e}",
+                "source": self._infer_source(url)
+            }
         except Exception as e:
             return {
                 "url": url,

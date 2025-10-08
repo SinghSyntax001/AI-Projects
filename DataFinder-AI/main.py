@@ -3,7 +3,8 @@
 from agents.search_agent import SearchAgent
 from agents.scrape_agent import ScrapeAgent
 from agents.relevance_agent import RelevanceAgent
-# from agents.dataset_evaluator_agent import DatasetEvaluatorAgent  # 👈 optional LLM evaluator
+from agents.dataset_evaluator import DatasetEvaluatorAgent
+import concurrent.futures
 
 def run_pipeline(query: str, top_k: int = 5):
     """
@@ -22,14 +23,21 @@ def run_pipeline(query: str, top_k: int = 5):
     urls = search_agent.search(query)
     print(f"\n[DEBUG] Found {len(urls)} dataset candidates")
 
-    # Step 2: Scrape
+    # Step 2: Scrape with Concurrency
     print("\n🔍 Scraping metadata...")
     scraper = ScrapeAgent()
     all_metadata = []
-    for r in urls:
-        metadata = scraper.scrape_metadata(r["url"])
-        all_metadata.append(metadata)
-        print(f"[DEBUG] Scraped: {metadata.get('title', 'N/A')}")
+
+    with concurrent.futures.ThreadPoolExecutor(max_workers=5) as executor:
+        future_to_url = {executor.submit(scraper.scrape_metadata, r["url"]): r["url"] for r in urls}
+        for future in concurrent.futures.as_completed(future_to_url):
+            url = future_to_url[future]
+            try:
+                metadata = future.result()
+                all_metadata.append(metadata)
+                print(f"[DEBUG] Scraped: {metadata.get('title', 'N/A')}")
+            except Exception as exc:
+                print(f"[DEBUG] {url} generated an exception: {exc}")
 
     # Step 3: Relevance Evaluation
     print("\n🧠 Evaluating relevance...")
@@ -44,10 +52,10 @@ def run_pipeline(query: str, top_k: int = 5):
     scored_results = sorted(scored_results, key=lambda x: x.get("relevance_score", 0), reverse=True)
 
     # Step 4: (Optional) LLM-based Robustness Evaluation
-    # evaluator = DatasetEvaluatorAgent()
-    # for entry in scored_results[:top_k]:
-    #     eval_result = evaluator.evaluate(query, entry)
-    #     entry.update(eval_result)
+    evaluator = DatasetEvaluatorAgent()
+    for entry in scored_results[:top_k]:
+        eval_result = evaluator.evaluate(query, entry)
+        entry.update(eval_result)
 
     return scored_results[:top_k]
 
@@ -66,8 +74,8 @@ def main():
         print(f"Description: {entry.get('description', '')[:200]}...")
         print(f"Relevance Score: {entry.get('relevance_score', 'N/A')}")
         print(f"Reason: {entry.get('reason', 'N/A')}")
-        # print(f"Robustness Score: {entry.get('robustness_score', 'N/A')}")
-        # print(f"Robustness Reason: {entry.get('reason', 'N/A')}")
+        print(f"Robustness Score: {entry.get('robustness_score', 'N/A')}")
+        print(f"Robustness Reason: {entry.get('reason', 'N/A')}")
 
 
 if __name__ == "__main__":
