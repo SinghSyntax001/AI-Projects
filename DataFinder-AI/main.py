@@ -1,10 +1,13 @@
-# main.py
+import sys, os
+from dotenv import load_dotenv
+import concurrent.futures
 
 from agents.search_agent import SearchAgent
 from agents.scrape_agent import ScrapeAgent
 from agents.relevance_agent import RelevanceAgent
 from agents.dataset_evaluator import DatasetEvaluatorAgent
-import concurrent.futures
+
+load_dotenv() # Load the environment variables from the .env file
 
 def run_pipeline(query: str, top_k: int = 5):
     """
@@ -12,7 +15,7 @@ def run_pipeline(query: str, top_k: int = 5):
     1. Search across sources
     2. Scrape metadata
     3. Rank by relevance
-    4. (Optional) Evaluate robustness with LLM
+    4. Evaluate robustness with LLM
     """
 
     print("📦 AutoDataFinder.AI – Dataset Discovery Agent")
@@ -51,7 +54,7 @@ def run_pipeline(query: str, top_k: int = 5):
     # Sort by relevance score
     scored_results = sorted(scored_results, key=lambda x: x.get("relevance_score", 0), reverse=True)
 
-    # Step 4: (Optional) LLM-based Robustness Evaluation
+    # Step 4: LLM-based Robustness Evaluation
     evaluator = DatasetEvaluatorAgent()
     for entry in scored_results[:top_k]:
         eval_result = evaluator.evaluate(query, entry)

@@ -1,8 +1,11 @@
 import sys, os
+from dotenv import load_dotenv # Add this import
 sys.path.append(os.path.abspath(os.path.join(os.path.dirname(__file__), "..")))
 
 import streamlit as st
 from main import run_pipeline
+
+load_dotenv() # Add this function call
 
 st.title("📊 DataFinder-AI")
 st.subheader("Find the most relevant datasets for your ML problem")
