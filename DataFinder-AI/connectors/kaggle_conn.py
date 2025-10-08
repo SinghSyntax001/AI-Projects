@@ -5,7 +5,7 @@ def kaggle_search(query: str, max_results: int = 10) -> List[Dict]:
     kaggleapi = KaggleApi()
     kaggleapi.authenticate()
     
-    datasets = kaggleapi.dataset_list(search=query, max_results=max_results)
+    datasets = kaggleapi.dataset_list(search=query, size=max_results)
     results = []
     
     for dataset in datasets:
