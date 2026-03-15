@@ -1,0 +1,359 @@
+<!doctype html>
+<html lang="en" class="scroll-smooth">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>{{ app_name }} - AI Dataset Discovery</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css" />
+    <script>
+      tailwind.config = {
+        theme: {
+          extend: {
+            fontFamily: {
+              sans: ["Satoshi", "ui-sans-serif", "system-ui", "sans-serif"],
+              heading: ["Fraunces", "serif"],
+            },
+            colors: {
+              navy: {
+                50: "#f8f9fa",
+                900: "#0f1623",
+                950: "#08070f",
+              },
+              gold: {
+                300: "#fcd34d",
+                400: "#facc15",
+                500: "#eab308",
+              },
+            },
+            boxShadow: {
+              panel: "0 20px 60px rgba(15, 22, 35, 0.15)",
+              card: "0 4px 20px rgba(0, 0, 0, 0.1)",
+              glow: "0 0 30px rgba(234, 179, 8, 0.2)",
+            },
+            animation: {
+              "slide-in": "slideIn 0.3s ease-out",
+              "fade-in": "fadeIn 0.3s ease-out",
+              "pulse-glow": "pulseGlow 2s ease-in-out infinite",
+            },
+            keyframes: {
+              slideIn: {
+                "0%": { transform: "translateY(10px)", opacity: "0" },
+                "100%": { transform: "translateY(0)", opacity: "1" },
+              },
+              fadeIn: {
+                "0%": { opacity: "0" },
+                "100%": { opacity: "1" },
+              },
+              pulseGlow: {
+                "0%, 100%": { boxShadow: "0 0 20px rgba(234, 179, 8, 0.1)" },
+                "50%": { boxShadow: "0 0 40px rgba(234, 179, 8, 0.3)" },
+              },
+            },
+          },
+        },
+      };
+    </script>
+    <link rel="stylesheet" href="{{ url_for('static', path='css/style.css') }}" />
+  </head>
+  <body class="min-h-screen bg-gradient-to-b from-slate-900 via-slate-800 to-slate-900 text-slate-100" data-theme="dark">
+    <div class="page-wrapper">
+      <!-- Navigation Header -->
+      <header class="sticky top-0 z-50 backdrop-blur-md border-b border-slate-700/50 bg-slate-900/80">
+        <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
+          <div class="flex items-center justify-between h-20">
+            <!-- Logo -->
+            <div class="flex items-center space-x-3">
+              <div class="w-10 h-10 bg-gradient-to-br from-gold-400 to-gold-500 rounded-lg flex items-center justify-center shadow-lg">
+                <i class="fas fa-search text-slate-900 font-bold"></i>
+              </div>
+              <div>
+                <h1 class="text-xl font-bold text-white">DataFinder</h1>
+                <p class="text-xs text-gold-400">AI Dataset Discovery</p>
+              </div>
+            </div>
+
+            <!-- Header Actions -->
+            <div class="flex items-center space-x-4">
+              <button id="theme-toggle" class="p-2 rounded-lg hover:bg-slate-800 transition text-slate-400 hover:text-gold-400" title="Toggle theme">
+                <i class="fas fa-moon w-5 h-5"></i>
+              </button>
+              <button id="history-toggle" class="p-2 rounded-lg hover:bg-slate-800 transition text-slate-400 hover:text-gold-400" title="Search history">
+                <i class="fas fa-history w-5 h-5"></i>
+              </button>
+              <button id="favorites-toggle" class="p-2 rounded-lg hover:bg-slate-800 transition text-slate-400 hover:text-gold-400 relative">
+                <i class="fas fa-heart w-5 h-5"></i>
+                <span id="favorites-badge" class="absolute top-0 right-0 w-5 h-5 bg-gold-500 text-slate-900 text-xs rounded-full flex items-center justify-center font-bold hidden"></span>
+              </button>
+            </div>
+          </div>
+        </div>
+      </header>
+
+      <!-- Main Content -->
+      <main class="min-h-screen">
+        <!-- Hero Section with Search -->
+        <section class="relative py-12 md:py-20 overflow-hidden">
+          <!-- Background gradient -->
+          <div class="absolute inset-0 -z-10 bg-[radial-gradient(circle_at_top_left,_rgba(234,179,8,0.15),_transparent_50%),radial-gradient(circle_at_bottom_right,_rgba(59,130,246,0.1),_transparent_50%)]"></div>
+
+          <div class="max-w-5xl mx-auto px-4 sm:px-6 lg:px-8">
+            <!-- Hero Content -->
+            <div class="text-center mb-12 animate-fade-in">
+              <h2 class="text-4xl md:text-5xl lg:text-6xl font-bold text-white mb-4 leading-tight">
+                Find Your Perfect<br/><span class="bg-gradient-to-r from-gold-300 via-gold-400 to-gold-500 text-transparent bg-clip-text">Dataset</span>
+              </h2>
+              <p class="text-slate-300 text-lg md:text-xl max-w-2xl mx-auto">
+                Describe your research objective and let AI discover the most relevant datasets from Kaggle, UCI, and Hugging Face
+              </p>
+            </div>
+
+            <!-- Search Form -->
+            <div class="bg-gradient-to-b from-slate-800/50 to-slate-900/50 backdrop-blur-xl border border-slate-700/50 rounded-2xl p-8 shadow-panel">
+              <form id="search-form" class="space-y-6" novalidate>
+                <!-- Project Objective -->
+                <div>
+                  <label for="project-objective" class="block text-sm font-semibold text-slate-200 mb-3">
+                    <i class="fas fa-target text-gold-400 mr-2"></i>Project Objective
+                  </label>
+                  <textarea
+                    id="project-objective"
+                    name="objective"
+                    placeholder="E.g., Building a medical imaging classifier for lung cancer detection, or analyzing climate patterns in coastal regions..."
+                    rows="3"
+                    class="w-full px-4 py-3 bg-slate-800/50 border border-slate-700 rounded-lg text-white placeholder-slate-500 focus:outline-none focus:border-gold-400 focus:ring-2 focus:ring-gold-400/30 transition"
+                  ></textarea>
+                </div>
+
+                <!-- Search Keywords -->
+                <div>
+                  <label for="search-input" class="block text-sm font-semibold text-slate-200 mb-3">
+                    <i class="fas fa-search text-gold-400 mr-2"></i>Search Keywords
+                  </label>
+                  <input
+                    id="search-input"
+                    name="q"
+                    type="text"
+                    placeholder="medical imaging, climate data, financial records..."
+                    class="w-full px-4 py-3 bg-slate-800/50 border border-slate-700 rounded-lg text-white placeholder-slate-500 focus:outline-none focus:border-gold-400 focus:ring-2 focus:ring-gold-400/30 transition"
+                    autocomplete="off"
+                    required
+                  />
+                </div>
+
+                <!-- Filters Row -->
+                <div class="grid grid-cols-1 md:grid-cols-3 gap-4">
+                  <!-- Source Filter -->
+                  <div>
+                    <label for="source-filter" class="block text-sm font-semibold text-slate-200 mb-2">Source</label>
+                    <select id="source-filter" class="w-full px-3 py-2 bg-slate-800/50 border border-slate-700 rounded-lg text-white focus:outline-none focus:border-gold-400 focus:ring-2 focus:ring-gold-400/30 transition">
+                      <option value="">All Sources</option>
+                      <option value="kaggle">Kaggle</option>
+                      <option value="uci">UCI ML Repository</option>
+                      <option value="huggingface">Hugging Face</option>
+                    </select>
+                  </div>
+
+                  <!-- Sort By -->
+                  <div>
+                    <label for="sort-filter" class="block text-sm font-semibold text-slate-200 mb-2">Sort By</label>
+                    <select id="sort-filter" class="w-full px-3 py-2 bg-slate-800/50 border border-slate-700 rounded-lg text-white focus:outline-none focus:border-gold-400 focus:ring-2 focus:ring-gold-400/30 transition">
+                      <option value="relevance">Relevance (Default)</option>
+                      <option value="newest">Newest First</option>
+                      <option value="popularity">Most Popular</option>
+                    </select>
+                  </div>
+
+                  <!-- Results Per Page -->
+                  <div>
+                    <label for="limit-filter" class="block text-sm font-semibold text-slate-200 mb-2">Results</label>
+                    <select id="limit-filter" class="w-full px-3 py-2 bg-slate-800/50 border border-slate-700 rounded-lg text-white focus:outline-none focus:border-gold-400 focus:ring-2 focus:ring-gold-400/30 transition">
+                      <option value="10">10 Results</option>
+                      <option value="20">20 Results</option>
+                      <option value="50">50 Results</option>
+                    </select>
+                  </div>
+                </div>
+
+                <!-- Action Buttons -->
+                <div class="flex gap-3 pt-4">
+                  <button
+                    id="search-button"
+                    type="submit"
+                    class="flex-1 px-6 py-3 bg-gradient-to-r from-gold-400 to-gold-500 hover:from-gold-300 hover:to-gold-400 text-slate-900 font-semibold rounded-lg transition transform hover:scale-105 shadow-lg flex items-center justify-center gap-2"
+                  >
+                    <i class="fas fa-search"></i>
+                    <span id="search-button-text">Discover Datasets</span>
+                  </button>
+                  <button
+                    id="clear-button"
+                    type="reset"
+                    class="px-6 py-3 bg-slate-800/50 hover:bg-slate-700/50 border border-slate-700 text-slate-200 font-semibold rounded-lg transition"
+                  >
+                    <i class="fas fa-redo mr-2"></i>Clear
+                  </button>
+                </div>
+
+                <!-- Status Messages -->
+                <div id="loading-state" class="hidden items-center gap-3 rounded-lg bg-slate-800/50 border border-slate-700 px-4 py-3 text-sm text-slate-300" aria-live="polite">
+                  <div class="animate-spin">
+                    <i class="fas fa-spinner text-gold-400 w-5 h-5"></i>
+                  </div>
+                  <span>Searching across datasets...</span>
+                </div>
+
+                <div id="status-message" class="hidden rounded-lg border px-4 py-3 text-sm" role="alert" aria-live="polite"></div>
+              </form>
+            </div>
+          </div>
+        </section>
+
+        <!-- Results Section -->
+        <section class="py-12 max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
+          <!-- Results Header -->
+          <div class="flex items-center justify-between mb-8">
+            <div>
+              <h3 class="text-2xl font-bold text-white flex items-center gap-3">
+                <i class="fas fa-database text-gold-400"></i>
+                <span id="results-title">Search Results</span>
+              </h3>
+              <p id="results-count" class="text-slate-400 mt-1"></p>
+            </div>
+            <div id="view-toggle" class="flex gap-2 p-1 bg-slate-800/50 rounded-lg border border-slate-700">
+              <button class="view-toggle-btn active px-4 py-2 rounded-md text-sm font-medium text-white transition" data-view="grid">
+                <i class="fas fa-th-large mr-2"></i>Grid
+              </button>
+              <button class="view-toggle-btn px-4 py-2 rounded-md text-sm font-medium text-slate-400 hover:text-white transition" data-view="list">
+                <i class="fas fa-list mr-2"></i>List
+              </button>
+            </div>
+          </div>
+
+          <!-- Results Grid -->
+          <div id="results-grid" class="grid gap-6 md:grid-cols-2 lg:grid-cols-3"></div>
+
+          <!-- Empty State -->
+          <div id="empty-state" class="text-center py-16 hidden">
+            <div class="rounded-full w-20 h-20 bg-slate-800 flex items-center justify-center mx-auto mb-4">
+              <i class="fas fa-search text-gold-400 text-4xl"></i>
+            </div>
+            <h3 class="text-xl font-bold text-white mb-2">No Results Found</h3>
+            <p class="text-slate-400">Try adjusting your search keywords or filters</p>
+          </div>
+        </section>
+      </main>
+
+      <!-- Footer -->
+      <footer class="border-t border-slate-700/50 bg-slate-900/50 backdrop-blur-sm py-8">
+        <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 text-center text-slate-400 text-sm">
+          <p>DataFinder AI © 2024 | <span class="text-slate-500">Powered by FAISS Semantic Search</span></p>
+        </div>
+      </footer>
+    </div>
+
+    <!-- Detail Modal -->
+    <div id="detail-modal" class="fixed inset-0 z-50 hidden bg-black/50 backdrop-blur-sm flex items-center justify-center p-4 overflow-y-auto">
+      <div class="bg-slate-800 border border-slate-700 rounded-2xl shadow-2xl max-w-2xl w-full my-8 animate-slide-in">
+        <div class="relative">
+          <button id="modal-close" class="absolute top-4 right-4 z-10 p-2 rounded-lg hover:bg-slate-700 text-slate-400 hover:text-white transition">
+            <i class="fas fa-times w-6 h-6"></i>
+          </button>
+          <div id="modal-content" class="p-8"></div>
+        </div>
+      </div>
+    </div>
+
+    <!-- Search History Sidebar -->
+    <div id="history-sidebar" class="fixed inset-y-0 right-0 z-40 w-80 bg-slate-800 border-l border-slate-700/50 transform translate-x-full transition-transform duration-300 overflow-y-auto">
+      <div class="p-6">
+        <div class="flex items-center justify-between mb-6">
+          <h3 class="text-lg font-bold text-white flex items-center gap-2">
+            <i class="fas fa-history text-gold-400"></i>Search History
+          </h3>
+          <button id="history-close" class="p-2 rounded-lg hover:bg-slate-700 text-slate-400 hover:text-white">
+            <i class="fas fa-times w-5 h-5"></i>
+          </button>
+        </div>
+        <div id="history-list" class="space-y-2"></div>
+        <div id="history-empty" class="text-center py-8 text-slate-400">No search history yet</div>
+      </div>
+    </div>
+
+    <!-- Favorites Sidebar -->
+    <div id="favorites-sidebar" class="fixed inset-y-0 right-0 z-40 w-80 bg-slate-800 border-l border-slate-700/50 transform translate-x-full transition-transform duration-300 overflow-y-auto">
+      <div class="p-6">
+        <div class="flex items-center justify-between mb-6">
+          <h3 class="text-lg font-bold text-white flex items-center gap-2">
+            <i class="fas fa-heart text-gold-400"></i>Favorites
+          </h3>
+          <button id="favorites-close" class="p-2 rounded-lg hover:bg-slate-700 text-slate-400 hover:text-white">
+            <i class="fas fa-times w-5 h-5"></i>
+          </button>
+        </div>
+        <div id="favorites-list" class="space-y-3"></div>
+        <div id="favorites-empty" class="text-center py-8 text-slate-400">No favorite datasets yet</div>
+      </div>
+    </div>
+
+    <!-- Overlay for Sidebars -->
+    <div id="sidebar-overlay" class="fixed inset-0 z-30 bg-black/50 backdrop-blur-sm hidden"></div>
+
+    <script>
+      window.DATAFINDER_CONFIG = {
+        apiKey: {{ api_key | tojson }},
+      };
+    </script>
+    <script src="{{ url_for('static', path='js/main.js') }}" defer></script>
+  </body>
+</html>
+
+      <main class="mx-auto max-w-6xl px-6 pb-16 sm:px-8 lg:px-10">
+        <section class="glass-panel rounded-[2rem] border border-white/10 p-6 shadow-panel sm:p-8">
+          <form id="search-form" class="flex flex-col gap-4 lg:flex-row lg:items-center" novalidate>
+            <label for="search-input" class="sr-only">Search datasets</label>
+            <div class="relative flex-1">
+              <input
+                id="search-input"
+                name="q"
+                type="search"
+                placeholder="Search for datasets like medical imaging, climate records, or financial time series"
+                class="w-full rounded-2xl border border-white/10 bg-white/5 px-5 py-4 text-base text-white outline-none transition placeholder:text-slate-400 focus:border-teal-400 focus:bg-white/10 focus:ring-2 focus:ring-teal-400/30"
+                autocomplete="off"
+                required
+              />
+            </div>
+            <button
+              id="search-button"
+              type="submit"
+              class="inline-flex min-w-36 items-center justify-center rounded-2xl bg-teal-500 px-6 py-4 text-sm font-semibold text-slate-950 transition hover:bg-teal-400 focus:outline-none focus:ring-2 focus:ring-teal-300/60 disabled:cursor-not-allowed disabled:opacity-70"
+            >
+              <span id="search-button-text">Search</span>
+            </button>
+          </form>
+
+          <div id="loading-state" class="mt-6 hidden items-center gap-3 rounded-2xl border border-white/10 bg-white/5 px-4 py-3 text-sm text-slate-300" aria-live="polite">
+            <span class="spinner h-5 w-5 rounded-full border-2 border-slate-500 border-t-teal-400"></span>
+            <span>Searching datasets...</span>
+          </div>
+
+          <p id="status-message" class="mt-6 hidden rounded-2xl border border-white/10 bg-white/5 px-4 py-3 text-sm text-slate-300" aria-live="polite"></p>
+        </section>
+
+        <section class="mt-8">
+          <div class="mb-5 flex items-center justify-between gap-4">
+            <h2 class="text-2xl font-bold tracking-tight text-white">Results</h2>
+            <p id="results-count" class="text-sm text-slate-400"></p>
+          </div>
+          <div id="results-grid" class="grid gap-5 md:grid-cols-2 xl:grid-cols-3"></div>
+        </section>
+      </main>
+    </div>
+
+    <script>
+      window.DATAFINDER_CONFIG = {
+        apiKey: {{ api_key | tojson }},
+      };
+    </script>
+    <script src="{{ url_for('static', path='js/main.js') }}" defer></script>
+  </body>
+</html>
