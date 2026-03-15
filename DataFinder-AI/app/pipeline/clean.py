@@ -1,3 +1,10 @@
+"""
+Data cleaning and normalization utilities.
+
+Cleanses raw dataset records by removing duplicates, normalizing text,
+and standardizing fields for consistent storage.
+"""
+
 import logging
 from collections.abc import Iterable
 
@@ -6,10 +13,17 @@ logger = logging.getLogger("datafinder.pipeline.clean")
 
 
 def _normalize_whitespace(value: str | None) -> str:
+    """Normalize whitespace in a string (remove extra spaces, trim)."""
     return " ".join((value or "").split())
 
 
 def normalize_tags(tags: Iterable[str] | str | None) -> list[str]:
+    """
+    Normalize and deduplicate tags.
+
+    Handles strings (split by comma or pipe), iterables, or None.
+    Converts to lowercase and removes duplicates.
+    """
     if tags is None:
         return []
     if isinstance(tags, str):
@@ -26,10 +40,18 @@ def normalize_tags(tags: Iterable[str] | str | None) -> list[str]:
 
 
 def remove_null_fields(item: dict) -> dict:
-    return {key: value for key, value in item.items() if value not in (None, "", [], {})}
+    """Remove fields with None, empty string, empty list, or empty dict values."""
+    return {
+        key: value for key, value in item.items() if value not in (None, "", [], {})
+    }
 
 
 def remove_duplicates(items: list[dict]) -> list[dict]:
+    """
+    Remove duplicate dataset records by URL.
+
+    Keeps the first occurrence of each unique URL and discards duplicates.
+    """
     seen_urls: set[str] = set()
     unique_items: list[dict] = []
 
@@ -55,5 +77,8 @@ def clean_datasets(items: list[dict]) -> list[dict]:
             "size": _normalize_whitespace(item.get("size")) or "unknown",
         }
         cleaned.append(remove_null_fields(normalized))
-    logger.info("cleaned dataset metadata", extra={"event_data": {"input_count": len(items), "output_count": len(cleaned)}})
+    logger.info(
+        "cleaned dataset metadata",
+        extra={"event_data": {"input_count": len(items), "output_count": len(cleaned)}},
+    )
     return cleaned

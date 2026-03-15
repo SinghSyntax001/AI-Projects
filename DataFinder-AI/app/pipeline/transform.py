@@ -57,6 +57,18 @@ class SearchResponse(BaseModel):
 
 @lru_cache
 def get_embedding_model():
+    """
+    Load the sentence embedding model with caching.
+
+    Uses all-MiniLM-L6-v2 by default (small, fast, good for semantic search).
+    Model is cached so it's only loaded once per application lifetime.
+
+    Returns:
+        SentenceTransformer model instance
+
+    Raises:
+        RuntimeError if sentence-transformers package is not installed
+    """
     if SentenceTransformer is None:
         raise RuntimeError("sentence-transformers is required for embedding generation")
     settings = get_settings()
@@ -64,12 +76,28 @@ def get_embedding_model():
 
 
 def generate_embeddings(items: list[dict]) -> list[list[float]]:
+    """
+    Generate semantic embeddings for a list of dataset records.
+
+    Converts each dataset record's combined text into a normalized
+    embedding vector for similarity search.
+
+    Args:
+        items: List of dataset dictionaries
+
+    Returns:
+        List of embedding vectors (normalized to unit length)
+    """
     texts = [build_search_text(item) for item in items]
     if not texts:
         return []
     model = get_embedding_model()
-    embeddings = model.encode(texts, convert_to_tensor=False, normalize_embeddings=True).tolist()
-    logger.info("generated embeddings", extra={"event_data": {"count": len(embeddings)}})
+    embeddings = model.encode(
+        texts, convert_to_tensor=False, normalize_embeddings=True
+    ).tolist()
+    logger.info(
+        "generated embeddings", extra={"event_data": {"count": len(embeddings)}}
+    )
     return embeddings
 
 
@@ -113,7 +141,9 @@ def prepare_database_records(items: list[dict]) -> list[DatasetRecord]:
                 keywords=keyword_sets[index] if index < len(keyword_sets) else [],
             )
         )
-    logger.info("prepared database records", extra={"event_data": {"count": len(records)}})
+    logger.info(
+        "prepared database records", extra={"event_data": {"count": len(records)}}
+    )
     return records
 
 
@@ -124,13 +154,23 @@ def build_search_text(item: dict) -> str:
     else:
         tag_text = " ".join(tags)
     return " ".join(
-        part for part in [item.get("name", ""), item.get("description", ""), tag_text, item.get("source", "")]
+        part
+        for part in [
+            item.get("name", ""),
+            item.get("description", ""),
+            tag_text,
+            item.get("source", ""),
+        ]
         if part
     )
 
 
 def to_response(dataset, score: float | None = None) -> DatasetResponse:
-    tag_list = dataset.tags.split(",") if isinstance(dataset.tags, str) and dataset.tags else dataset.tags or []
+    tag_list = (
+        dataset.tags.split(",")
+        if isinstance(dataset.tags, str) and dataset.tags
+        else dataset.tags or []
+    )
     return DatasetResponse(
         id=dataset.id,
         name=dataset.name,

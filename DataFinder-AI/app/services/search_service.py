@@ -14,7 +14,12 @@ from app.config import Settings
 from app.database.models import Dataset
 from app.pipeline.clean import clean_datasets
 from app.pipeline.ingest import DatasetIngestor
-from app.pipeline.transform import build_search_text, get_embedding_model, prepare_database_records, to_response
+from app.pipeline.transform import (
+    build_search_text,
+    get_embedding_model,
+    prepare_database_records,
+    to_response,
+)
 
 try:
     import faiss
@@ -38,18 +43,23 @@ class SearchService:
         self.metadata_path = Path(settings.faiss_metadata_path)
         self.embedding_dimension = int(self.model.get_sentence_embedding_dimension())
 
-    def search(self, query: str, limit: int | None = None) -> list[dict]:
+    def search(self, query: str, limit: int | None = None, skip: int = 0) -> list[dict]:
         if self.db.scalar(select(Dataset.id).limit(1)) is None:
             self.ensure_data(query, limit, force_refresh=True)
 
         top_limit = min(limit or 10, 10)
         query_embedding = np.asarray(
-            self.model.encode(query, convert_to_tensor=False, normalize_embeddings=True),
+            self.model.encode(
+                query, convert_to_tensor=False, normalize_embeddings=True
+            ),
             dtype="float32",
         ).reshape(1, -1)
 
         if faiss is None:
-            logger.warning("faiss dependency missing, using numpy fallback", extra={"event_data": {"query": query}})
+            logger.warning(
+                "faiss dependency missing, using numpy fallback",
+                extra={"event_data": {"query": query}},
+            )
             return self._fallback_search(query_embedding, query, top_limit)
 
         index, id_mapping = self.load_or_build_index()
@@ -59,8 +69,65 @@ class SearchService:
         scores, positions = index.search(query_embedding, top_limit)
         return self._materialize_results(scores[0], positions[0], id_mapping, query)
 
-    def ensure_data(self, query: str, limit: int | None = None, force_refresh: bool = False) -> None:
-        if not force_refresh and self.db.scalar(select(Dataset.id).limit(1)) is not None:
+    def search_with_llm_refinement(
+        self, query: str, limit: int | None = None
+    ) -> tuple[str, list[dict]]:
+        """Search with LLM-assisted query refinement.
+
+        Uses LLM to understand intent and refine the search query for better results.
+
+        Args:
+            query: Original user query
+            limit: Number of results to return
+
+        Returns:
+            Tuple of (refined_query, results)
+        """
+        try:
+            from app.services.llm_service import LLMService
+
+            if not self.settings.groq_api_key:
+                # Fall back to standard search if LLM not configured
+                return query, self.search(query, limit)
+
+            llm = LLMService(
+                api_key=self.settings.groq_api_key,
+                model=self.settings.llm_model,
+                temperature=self.settings.llm_temperature,
+            )
+
+            # Extract intent and get refined query
+            intent_data = llm.extract_intent(query)
+            refined_query = intent_data.get("refined_query", query)
+
+            # Perform search with refined query
+            results = self.search(refined_query, limit)
+
+            logger.info(
+                "llm-assisted search completed",
+                extra={
+                    "event_data": {
+                        "original_query": query,
+                        "refined_query": refined_query,
+                        "intent": intent_data.get("intent", "unknown"),
+                        "results_count": len(results),
+                    }
+                },
+            )
+
+            return refined_query, results
+
+        except Exception as e:
+            logger.warning(f"LLM refinement failed, using original query: {e}")
+            return query, self.search(query, limit)
+
+    def ensure_data(
+        self, query: str, limit: int | None = None, force_refresh: bool = False
+    ) -> None:
+        if (
+            not force_refresh
+            and self.db.scalar(select(Dataset.id).limit(1)) is not None
+        ):
             return
 
         raw_items = self.ingestor.ingest(query, limit)
@@ -115,7 +182,12 @@ class SearchService:
         with self._index_lock:
             self.mapping_path.write_text(json.dumps(id_mapping), encoding="utf-8")
             self.metadata_path.write_text(
-                json.dumps({"count": len(id_mapping), "max_id": max(id_mapping) if id_mapping else 0}),
+                json.dumps(
+                    {
+                        "count": len(id_mapping),
+                        "max_id": max(id_mapping) if id_mapping else 0,
+                    }
+                ),
                 encoding="utf-8",
             )
 
@@ -127,19 +199,34 @@ class SearchService:
                 index.add(np.asarray(embeddings, dtype="float32"))
             faiss.write_index(index, str(self.index_path))
 
-        logger.info("rebuilt search index", extra={"event_data": {"count": len(id_mapping), "faiss_enabled": faiss is not None}})
+        logger.info(
+            "rebuilt search index",
+            extra={
+                "event_data": {
+                    "count": len(id_mapping),
+                    "faiss_enabled": faiss is not None,
+                }
+            },
+        )
 
     def load_or_build_index(self):
         if faiss is None:
             raise RuntimeError("FAISS is unavailable")
 
         with self._index_lock:
-            if self.index_path.exists() and self.mapping_path.exists() and self.metadata_path.exists():
+            if (
+                self.index_path.exists()
+                and self.mapping_path.exists()
+                and self.metadata_path.exists()
+            ):
                 index = faiss.read_index(str(self.index_path))
                 id_mapping = json.loads(self.mapping_path.read_text(encoding="utf-8"))
                 metadata = json.loads(self.metadata_path.read_text(encoding="utf-8"))
                 db_count, db_max_id = self._database_index_state()
-                if index.ntotal == len(id_mapping) == metadata.get("count") == db_count and metadata.get("max_id") == db_max_id:
+                if (
+                    index.ntotal == len(id_mapping) == metadata.get("count") == db_count
+                    and metadata.get("max_id") == db_max_id
+                ):
                     return index, id_mapping
                 logger.warning(
                     "search index metadata mismatch detected",
@@ -156,13 +243,17 @@ class SearchService:
 
         self.build_index()
         with self._index_lock:
-            return faiss.read_index(str(self.index_path)), json.loads(self.mapping_path.read_text(encoding="utf-8"))
+            return faiss.read_index(str(self.index_path)), json.loads(
+                self.mapping_path.read_text(encoding="utf-8")
+            )
 
     def _database_index_state(self) -> tuple[int, int]:
         ids = list(self.db.scalars(select(Dataset.id).order_by(Dataset.id)).all())
         return len(ids), max(ids) if ids else 0
 
-    def _fallback_search(self, query_embedding: np.ndarray, query: str, limit: int) -> list[dict]:
+    def _fallback_search(
+        self, query_embedding: np.ndarray, query: str, limit: int
+    ) -> list[dict]:
         datasets = list(self.db.scalars(select(Dataset).order_by(Dataset.id)).all())
         if not datasets:
             return []
@@ -179,11 +270,15 @@ class SearchService:
         if not embeddings:
             return []
 
-        scores = cosine_similarity(query_embedding, np.asarray(embeddings, dtype="float32"))[0]
+        scores = cosine_similarity(
+            query_embedding, np.asarray(embeddings, dtype="float32")
+        )[0]
         order = np.argsort(scores)[::-1][:limit]
         return self._materialize_results(scores, order, ids, query)
 
-    def _materialize_results(self, scores, positions, id_mapping, query: str) -> list[dict]:
+    def _materialize_results(
+        self, scores, positions, id_mapping, query: str
+    ) -> list[dict]:
         results: list[dict] = []
         for score, position in zip(scores, positions):
             position_int = int(position)
@@ -194,7 +289,13 @@ class SearchService:
                 continue
             logger.info(
                 "search query executed",
-                extra={"event_data": {"query": query, "dataset_id": dataset.id, "score": float(score)}},
+                extra={
+                    "event_data": {
+                        "query": query,
+                        "dataset_id": dataset.id,
+                        "score": float(score),
+                    }
+                },
             )
             results.append(to_response(dataset, float(score)).model_dump())
         return results
