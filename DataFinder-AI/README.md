@@ -1,57 +1,150 @@
+# DataFinder-AI
 
------
+DataFinder-AI is a FastAPI backend for discovering, normalizing, storing, and semantically searching machine learning datasets from public sources such as Kaggle, UCI, and Hugging Face.
 
-## 📊 DataFinder.AI - Dataset Discovery Agent
+## Project Overview
 
-### Features
+The service combines a lightweight data engineering pipeline with an API-first backend. Dataset metadata is ingested from external providers, cleaned into a consistent schema, transformed into searchable records, and exposed through secured REST endpoints.
 
-  * **🔍 Multi-Source Search**: Scans for relevant datasets across Hugging Face, Kaggle, and DuckDuckGo.
-  * **📄 Intelligent Scraping**: Scrapes dataset pages to extract key metadata, including title, description, and source.
-  * **🧠 Two-Layer Evaluation**:
-      * **Relevance Agent**: Uses a `SentenceTransformer` model to calculate a **relevance score** based on the similarity between the user query and the dataset's text.
-      * **LLM Evaluator**: An optional LLM-based agent provides a **robustness score** and a detailed reason for each dataset, analyzing its suitability for an ML problem.
-  * **💻 Command-Line Interface (CLI)**: Run the agent directly from your terminal.
-  * **🌐 Streamlit UI**: A web-based interface for easy interaction and result viewing.
+## Architecture
 
-### Installation
-
-1.  Navigate to the project directory.
-    ```bash
-    cd DataFinder-AI
-    ```
-2.  Install the required dependencies.
-    ```bash
-    pip install -r requirements.txt
-    ```
-3.  Set up your API key. Create a `.env` file in the `DataFinder-AI` directory and add your Groq API key:
-    ```
-    GROQ_API_KEY=your_groq_api_key_here
-    ```
-
-### Usage
-
-This project can be run in two ways.
-
-#### CLI
-
-Run the main script and provide a query when prompted.
-
-```bash
-python main.py
+```text
+Client
+  |
+  v
+FastAPI Routes
+  |
+  v
+Services
+  |-- Search Service
+  |-- Dataset Service
+  |
+  v
+Pipeline
+  |-- Ingest
+  |-- Clean
+  |-- Transform
+  |
+  v
+SQLAlchemy
+  |
+  v
+SQLite / PostgreSQL
 ```
 
-#### Streamlit Web App
+## Features
 
-Launch the web interface using Streamlit.
+- FastAPI server with CORS enabled
+- API key authentication using `Authorization: Bearer <API_KEY>`
+- Dataset ingestion from Kaggle, UCI, and Hugging Face
+- Cleaning pipeline for duplicate removal, tag normalization, and null-field pruning
+- Semantic search with `sentence-transformers` and a persisted FAISS vector index
+- SQLAlchemy database layer with SQLite by default and PostgreSQL support in Docker Compose
+- Background ingestion every 6 hours with APScheduler
+- Structured JSON logging for API requests and pipeline runs
+- Health check and OpenAPI docs
+
+## Tech Stack
+
+- FastAPI
+- SQLAlchemy
+- Sentence Transformers
+- FAISS
+- scikit-learn
+- SQLite
+- PostgreSQL
+- Docker
+- Pytest
+
+## API Endpoints
+
+- `GET /health`
+- `GET /search?q=<query>`
+- `GET /datasets`
+- `GET /datasets/{id}`
+
+All endpoints except `/health` require a bearer token.
+
+## Local Development
+
+1. Install dependencies.
 
 ```bash
-streamlit run ui/app.py
+pip install -r requirements.txt
 ```
 
-The app will open in your browser, where you can enter your query.
+2. Create a `.env` file in the project root.
 
------
+```env
+API_KEY=change-me
+DATABASE_URL=sqlite:///data/datafinder.db
+APP_ENV=development
+```
 
-## 🤝 Contributing
+3. Run the API.
 
-Contributions are welcome\! If you have suggestions for improvement or find any issues, please feel free to open a pull request or an issue on the repository.
+```bash
+uvicorn app.main:app --reload
+```
+
+4. Open the docs.
+
+```text
+http://localhost:8000/docs
+```
+
+The search endpoint returns semantically ranked datasets with similarity scores, source, and dataset links.
+
+## Docker
+
+Build and run with Docker:
+
+```bash
+docker build -t datafinder-ai .
+docker run -p 8000:8000 -e API_KEY=change-me datafinder-ai
+```
+
+Run the app with PostgreSQL using Docker Compose:
+
+```bash
+docker compose up --build
+```
+
+## Observability
+
+- Request logs are written as JSON to `logs/app.log`
+- Ingestion runs and search queries are logged for troubleshooting
+- The FAISS index is persisted under `data/` and reloaded on restart
+
+## Deployment
+
+### Render
+
+- Create a new Web Service from the repository
+- Set the start command to `uvicorn app.main:app --host 0.0.0.0 --port 8000`
+- Add environment variables such as `API_KEY` and `DATABASE_URL`
+
+### Railway
+
+- Create a new project from the repository
+- Provision a PostgreSQL service
+- Set `DATABASE_URL` and deploy the FastAPI app
+
+### Fly.io
+
+- Install the Fly CLI and run `fly launch`
+- Set secrets for `API_KEY` and `DATABASE_URL`
+- Deploy with `fly deploy`
+
+## Testing
+
+```bash
+pytest
+```
+
+## Suggested Commits
+
+- `feat: add FastAPI API layer`
+- `feat: add dataset ingestion pipeline`
+- `feat: implement semantic search`
+- `feat: dockerize application`
