@@ -1,0 +1,28 @@
+version: "3.9"
+
+services:
+  api:
+    build: .
+    ports:
+      - "8000:8000"
+    environment:
+      APP_ENV: docker
+      API_KEY: change-me
+      DATABASE_URL: postgresql+psycopg2://datafinder:datafinder@postgres:5432/datafinder
+    depends_on:
+      - postgres
+
+  postgres:
+    image: postgres:15
+    restart: unless-stopped
+    environment:
+      POSTGRES_DB: datafinder
+      POSTGRES_USER: datafinder
+      POSTGRES_PASSWORD: datafinder
+    ports:
+      - "5432:5432"
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+
+volumes:
+  postgres_data:
